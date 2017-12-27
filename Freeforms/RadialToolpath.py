@@ -107,3 +107,20 @@ root.destroy()
 # to arclength and neighboring X offsets
 
 print(minimum_radius)
+
+# Surface finish estimation
+outerEdgeRadius = surf[-1][0]
+innerEdgeRadius = surf[1][0]
+outerEdgeArc = np.deg2rad(angular_resolution) * outerEdgeRadius
+innerEdgeArc = np.deg2rad(angular_resolution) * innerEdgeRadius
+inE = innerEdgeArc / 2
+outE = outerEdgeArc / 2
+
+innerEdgeSurfaceFinish = np.sqrt((1 / innerEdgeArc) * np.square(tool_radius) * ((-inE * np.sqrt(1 - (np.square(inE) / np.square(tool_radius))) + tool_radius * np.arcsin(-inE / tool_radius)) - (inE * np.sqrt(1 - (np.square(inE) / np.square(tool_radius))) + tool_radius * np.arcsin(inE / tool_radius)) + (inE - np.power(inE, 3)/(3 * np.square(tool_radius))) - (-inE - np.power(-inE, 3)/(3 * np.square(tool_radius))) + 2 * inE))
+outerEdgeSurfaceFinish = np.sqrt((1 / outerEdgeArc) * np.square(tool_radius) * ((-outE * np.sqrt(1 - (np.square(outE) / np.square(tool_radius))) + tool_radius * np.arcsin(-outE / tool_radius)) - (outE * np.sqrt(1 - (np.square(outE) / np.square(tool_radius))) + tool_radius * np.arcsin(outE / tool_radius)) + (outE - np.power(outE, 3)/(3 * np.square(tool_radius))) - (-outE - np.power(-outE, 3)/(3 * np.square(tool_radius))) + 2 * outE))
+print('Predicted inner surface finish: ', innerEdgeSurfaceFinish * 10**6, 'nmRMS')
+print('Predicted outer surface finish: ', outerEdgeSurfaceFinish * 10**6, 'nmRMS')
+
+# TODO:     * resample for higher angular resolution if finish too high
+#           * push toolpath over to fit in valley if tool_radius > minimum_radius
+
