@@ -5,6 +5,8 @@
 # an x list and a z list. It also generates an output .csv. When
 # run as a standalone program, instead of as a module, it also has
 # UI elements for opening the file and reporting the output location.
+# 3/26/2018: Fixed some PEP8 formatting errors. Removed the file path code from the __main__ section (it's still in the
+#   function, and wasn't called in the __main__ part of the code)
 
 # Setup
 def XZtoNC(ncmainfilename: str):
@@ -16,7 +18,7 @@ def XZtoNC(ncmainfilename: str):
     import re
 
     ncfcfilename = ''
-    ## Scan the Main file to find the Child file(s)
+    # Scan the Main file to find the Child file(s)
     mnfile = open(ncmainfilename)
     for line in mnfile:  # Look for the child script
         #    print(line)
@@ -26,10 +28,10 @@ def XZtoNC(ncmainfilename: str):
     if ncfcfilename == '':
         ncfcfilename = ncmainfilename
 
-    ncpath = ncmainfilename.split("/")[0:-1]  # Take the path from the Main NC file
-    ncpath = '/'.join(ncpath)  # Rejoin it into a single string
+    nc_path_segments = ncmainfilename.split("/")[0:-1]  # Take the path from the Main NC file
+    nc_path = '/'.join(nc_path_segments)  # Rejoin it into a single string
 
-    ncfcfilename = ncpath + "/" + ncfcfilename  # Append the Child script filename
+    ncfcfilename = nc_path + "/" + ncfcfilename  # Append the Child script filename
 
     mnfile.close()
 
@@ -56,22 +58,19 @@ def XZtoNC(ncmainfilename: str):
     ncinfile.close()  # Release both files
     ncoutfile.close()
     coords = [xes, zes]
-    return (coords)
+    return coords
 
 
 if __name__ == "__main__":
     import tkinter
     from tkinter import filedialog
 
-    ## Import the file
+    # Import the file
     root = tkinter.Tk()
     ncmainfilename = filedialog.askopenfilename(initialdir="/", title="Select Main NC file", filetypes=(
         ("G-code Files", "*.nc"), ("G-code Files (Backup)", "*.nc.bak"), ("all files", "*.*")))
-    ncpath = ncmainfilename.split("/")[0:-1]  # Take the path from the Main NC file
-    ncpath = '/'.join(ncpath)  # Rejoin it into a single string
 
     XZtoNC(ncmainfilename)
-
 
     # Provide an output file message
     def close_outstring():
