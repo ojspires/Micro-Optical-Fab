@@ -6,12 +6,15 @@
 # run as a standalone program, instead of as a module, it also has
 # UI elements for opening the file and reporting the output location.
 # 3/26/2018: Fixed some PEP8 formatting errors. Removed the file path code from the __main__ section (it's still in the
-#   function, and wasn't called in the __main__ part of the code)
+#   function, and wasn't called in the __main__ part of the code). Renamed XZtoNC to x_z_to_n_c to follow convention.
+#   Renamed function input variable to prevent confusion with the function call.
 
 # Setup
-def XZtoNC(ncmainfilename: str):
+
+
+def x_z_to_nc(n_c_main_filename: str):
     """
-    :type ncmainfilename: str
+    :type n_c_main_filename: str
 
 
     """
@@ -19,16 +22,16 @@ def XZtoNC(ncmainfilename: str):
 
     ncfcfilename = ''
     # Scan the Main file to find the Child file(s)
-    mnfile = open(ncmainfilename)
+    mnfile = open(n_c_main_filename)
     for line in mnfile:  # Look for the child script
         #    print(line)
         if line.startswith("M98"):
             line = line[4:]  # Strip "M98(" from the filename
             ncfcfilename = line.split(")")[0]  # and the ")" from the end of it
     if ncfcfilename == '':
-        ncfcfilename = ncmainfilename
+        ncfcfilename = n_c_main_filename
 
-    nc_path_segments = ncmainfilename.split("/")[0:-1]  # Take the path from the Main NC file
+    nc_path_segments = n_c_main_filename.split("/")[0:-1]  # Take the path from the Main NC file
     nc_path = '/'.join(nc_path_segments)  # Rejoin it into a single string
 
     ncfcfilename = nc_path + "/" + ncfcfilename  # Append the Child script filename
@@ -70,7 +73,7 @@ if __name__ == "__main__":
     ncmainfilename = filedialog.askopenfilename(initialdir="/", title="Select Main NC file", filetypes=(
         ("G-code Files", "*.nc"), ("G-code Files (Backup)", "*.nc.bak"), ("all files", "*.*")))
 
-    XZtoNC(ncmainfilename)
+    x_z_to_nc(ncmainfilename)
 
     # Provide an output file message
     def close_outstring():
