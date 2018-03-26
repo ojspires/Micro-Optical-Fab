@@ -97,7 +97,7 @@ for line in ncmaininfile:
     if "CYLINDER" in ncmainfilename.upper():  # If cyl path, set the initial offset
         if line == "#506 = 0                                 ( LOOP COUNT )\n":
             line = line + "#545 = " + direction + "[#542]*[#541]                     ( X cut offset var )\n"
-    if line.startswith("#547"):               # The script won't take as long if we don't have to translate all the way to zmax. Make variable the offset; this can later be tied to filename or tool # or something
+    if line.startswith("#547"):               # The script won't take as long if we don't have to translate all the way to z = 0. Make variable the offset; this can later be tied to filename or tool # or something
         line = "#546 = -150.0                            ( Set Parking Position )\n#548 = 54                                ( Set offset number. Acceptable = 54 to 59 )\n" + line
     elif "PARKING POSITION" in line:          # Make the parking position a variable
         line = line.replace(" Z0.0 F200   ", " Z[#546] F200")
