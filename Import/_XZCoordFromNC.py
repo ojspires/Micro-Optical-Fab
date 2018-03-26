@@ -6,7 +6,8 @@
 # run as a standalone program, instead of as a module, it also has
 # UI elements for opening the file and reporting the output location.
 # 3/26/2018: Fixed some PEP8 formatting errors. Removed the file path code from the __main__ section (it's still in the
-#   function, and wasn't called in the __main__ part of the code)
+#   function, and wasn't called in the __main__ part of the code). Renamed XZtoNC to x_z_to_n_c to follow convention.
+#   Renamed function input variable to prevent confusion with the function call.
 
 # Setup
 
