@@ -2,7 +2,7 @@
 # This program takes a 3D  R-theta-Z profile, and generates GCODE to cut spoke paths which
 # follow that profile.
 # 3/27/18: Fixed header to have correct filename. Added surface Z to the Z offsets in surf_slope. Corrected XZ values in
-#   outro points and in reset segments (between part paths)
+#   outro points and in reset segments (between part paths). Variablized the lead-in/lead-out lengths (in_out_length)
 
 import numpy as np
 import tkinter
@@ -23,7 +23,7 @@ feed_rate = 2000
 tool_radius = .05
 bar_length = 60
 now = dt.now()
-
+in_out_length = .1
 
 def radius_calc(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float) -> tuple:
     ma = (y2-y1)/(x2-x1)
@@ -135,13 +135,13 @@ for r_index in surf_radius_index[1:]:
             # index 0:1 Out, index 2:3 In
             #     print(surf_slope[int(r_index)][int(a_index)])
             #     print(a_index)
-            x_out_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * -.5 + surf_slope[int(r_index-1)][int(a_index)][2]
-            z_out_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * -.5 + surf_slope[int(r_index-1)][int(a_index)][3]
+            x_out_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * -in_out_length + surf_slope[int(r_index-1)][int(a_index)][2]
+            z_out_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * -in_out_length + surf_slope[int(r_index-1)][int(a_index)][3]
             introOutro[0][int(a_index)] = x_out_point
             introOutro[1][int(a_index)] = z_out_point
         if r_index == surf_radius_index[-1]:
-            x_in_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * .5 + surf_slope[int(r_index)][int(a_index)][2]
-            z_in_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * .5 + surf_slope[int(r_index)][int(a_index)][3]
+            x_in_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * in_out_length + surf_slope[int(r_index)][int(a_index)][2]
+            z_in_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * in_out_length + surf_slope[int(r_index)][int(a_index)][3]
             introOutro[2][int(a_index)] = x_in_point
             introOutro[3][int(a_index)] = z_in_point
 root.destroy()
@@ -230,13 +230,13 @@ for a_index in surf_angle_index[1:]:
             # outro     TODOne: add Y and C coords    *implemented; test next
             # child_cutting = child_cutting + 'C{:.10f}'.format(surf[0][int(a_index)]) + \  # old formatting. reformatted to try to improve speed.
             #     ' X{:.10f}'.format(introOutro[2][int(a_index)]) + \
-            #     ' Y{:.10f}'.format(surf[1][0]-.5) + \
+            #     ' Y{:.10f}'.format(surf[1][0] - in_out_length) + \
             #     ' Z{:.10f}'.format(introOutro[3][int(a_index)]) + ' \n'
             child_cutting = ' \n'.join([child_cutting,
                                         'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
                                             surf[0][int(a_index)],
                                             introOutro[0][int(a_index)],
-                                            surf[1][0]-.5,
+                                            surf[1][0] - in_out_length,
                                             introOutro[1][int(a_index)])
                                         ])
             # print(str(index) + ' outro')
@@ -244,13 +244,13 @@ for a_index in surf_angle_index[1:]:
             # intro     TODOne: add Y and C coords    *implemented; test next
             # child_cutting = child_cutting + 'C{:.10f}'.format(surf[0][int(a_index)]) + \    # old formatting. reformatted to try to improve speed.
             #     ' X{:.10f}'.format(introOutro[2][int(a_index)]) + \
-            #     ' Y{:.10f}'.format(surf[-1][0]+.5) + \
+            #     ' Y{:.10f}'.format(surf[-1][0] + in_out_length) + \
             #     ' Z{:.10f}'.format(introOutro[3][int(a_index)]) + ' \n'
             child_cutting = ' \n'.join([child_cutting,
                                         'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f} (Intro)'.format(
                                             surf[0][int(a_index)],
                                             introOutro[2][int(a_index)],
-                                            surf[-1][0]+.5,
+                                            surf[-1][0] + in_out_length,
                                             introOutro[3][int(a_index)])
                                         ])
             # print(str(index) + ' intro')
@@ -287,7 +287,7 @@ for a_index in surf_angle_index[1:]:
         child_cutting,
         '/M29 \nZ{:.10f} \nY{:.10f} \nZ{:.10f} \n/M26 \n'.format(
             introOutro[1][int(a_index)] + 2,
-            surf[-1][0]+.5,
+            surf[-1][0] + in_out_length,
             introOutro[3][int(a_index)])
     ])
 
