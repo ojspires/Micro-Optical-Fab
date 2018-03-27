@@ -23,7 +23,8 @@ feed_rate = 2000
 tool_radius = .05
 bar_length = 60
 now = dt.now()
-in_out_length = .1
+in_out_length = .05
+
 
 def radius_calc(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float) -> tuple:
     ma = (y2-y1)/(x2-x1)
