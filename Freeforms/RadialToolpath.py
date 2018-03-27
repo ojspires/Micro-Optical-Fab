@@ -1,6 +1,8 @@
-# GratingFormatter.py   Oliver Spires   12/12/17
-# This program takes a grating profile from NanoCAM, and generates GCODE to cut a straight-line square grating which
-# follows that profile.
+# RadialToolpath.py   Oliver Spires   12/12/17
+# This program takes a 3D  R-theta-Z profile, and generates GCODE to cut spoke paths which
+# follow that profile.
+# 3/27/18: Fixed header to have correct filename. Added surface Z to the Z offsets in surf_slope. Corrected XZ values in
+#   outro points and in reset segments (between part paths)
 
 import numpy as np
 import tkinter
@@ -93,7 +95,7 @@ for r_index in surf_radius_index[1:]:
     #     local_y_offset = np.sqrt(np.square(tool_radius) - np.square(local_x))
     # print(local_x_offset)
     # print(local_y_offset)
-    surf_slope[int(r_index)][1] = [local_slope, local_radius[0], local_x_offset, local_y_offset]
+    surf_slope[int(r_index)][1] = [local_slope, local_radius[0], local_x_offset, local_y_offset + surf[int(r_index)][1]]
     # print(surf_slope[int(r_index)][1])
     # print(surf[int(r_index)][1])
     # print(surf[int(r_index)][-2])
@@ -108,7 +110,7 @@ for r_index in surf_radius_index[1:]:
     # if np.abs(local_x_offset) > local_x:  # pushover attempt
     #     local_x_offset = np.sign(local_x_offset) * local_x
     #     local_y_offset = np.sqrt(np.square(tool_radius) - np.square(local_x))
-    surf_slope[int(r_index)][-1] = [local_slope, local_radius[0], local_x_offset, local_y_offset]
+    surf_slope[int(r_index)][-1] = [local_slope, local_radius[0], local_x_offset, local_y_offset + surf[int(r_index)][-1]]
     for a_index in surf_angle_index[2:-1]:
         # print(surf[0][int(a_index)])
         local_slope = (surf[int(r_index)][int(a_index) + 1] - surf[int(r_index)][int(a_index) - 1]) / (2 * local_x)
@@ -122,7 +124,7 @@ for r_index in surf_radius_index[1:]:
         # if np.abs(local_x_offset) > local_x:  # pushover attempt
         #     local_x_offset = np.sign(local_x_offset) * local_x
         #     local_y_offset = np.sqrt(np.square(tool_radius) - np.square(local_x))
-        surf_slope[int(r_index)][int(a_index)] = [local_slope, local_radius[0], local_x_offset, local_y_offset]
+        surf_slope[int(r_index)][int(a_index)] = [local_slope, local_radius[0], local_x_offset, local_y_offset + surf[int(r_index)][int(a_index)]]
 
         # print(surf_slope[int(r_index)][int(a_index)])
     # print(surf_slope[int(r_index)][0:10])
@@ -134,7 +136,7 @@ for r_index in surf_radius_index[1:]:
             #     print(surf_slope[int(r_index)][int(a_index)])
             #     print(a_index)
             x_out_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * -.5 + surf_slope[int(r_index-1)][int(a_index)][2]
-            z_out_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * .5 + surf_slope[int(r_index-1)][int(a_index)][3]
+            z_out_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * -.5 + surf_slope[int(r_index-1)][int(a_index)][3]
             introOutro[0][int(a_index)] = x_out_point
             introOutro[1][int(a_index)] = z_out_point
         if r_index == surf_radius_index[-1]:
@@ -148,7 +150,7 @@ root.destroy()
 # For calculation of whether the tool will clear or not: compare required X offset for coordinate (based on local slope)
 # to arclength and neighboring X offsets
 
-print('\nMinimum tool radius:            {:.4f}'.format(minimum_radius))
+print('\nMinimum tool radius:             {:.4f}'.format(minimum_radius))
 
 # Surface finish estimation
 outerEdgeRadius = surf[-1][0]
@@ -209,7 +211,7 @@ cutting_blocks = ''  # Clear the cutting blocks and set it as a string so we can
 child_cutting = ''
 # TODOne: nest this inside an angle loop
 
-child_out = open(ncchildfile, 'a+')
+child_out = open(ncchildfile, 'w+')
 child_header = '( ' + ncchildfile + ') \n( Called by ' + ncmainoutfile + ' ) \n( on: ' + str(now)[:19] + ' ) \n\n( LOOPING SETUP ) \n#547 = #547 - #542 \nG52 Z[#547] \n\n( CUTTING BLOCKS ) \n'
 child_out.writelines(child_header)
 for a_index in surf_angle_index[1:]:
@@ -231,11 +233,11 @@ for a_index in surf_angle_index[1:]:
             #     ' Y{:.10f}'.format(surf[1][0]-.5) + \
             #     ' Z{:.10f}'.format(introOutro[3][int(a_index)]) + ' \n'
             child_cutting = ' \n'.join([child_cutting,
-                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f}'.format(
+                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
                                             surf[0][int(a_index)],
-                                            introOutro[2][int(a_index)],
+                                            introOutro[0][int(a_index)],
                                             surf[1][0]-.5,
-                                            introOutro[3][int(a_index)])
+                                            introOutro[1][int(a_index)])
                                         ])
             # print(str(index) + ' outro')
         elif index == profile_index[0]:
@@ -245,7 +247,7 @@ for a_index in surf_angle_index[1:]:
             #     ' Y{:.10f}'.format(surf[-1][0]+.5) + \
             #     ' Z{:.10f}'.format(introOutro[3][int(a_index)]) + ' \n'
             child_cutting = ' \n'.join([child_cutting,
-                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f}'.format(
+                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f} (Intro)'.format(
                                             surf[0][int(a_index)],
                                             introOutro[2][int(a_index)],
                                             surf[-1][0]+.5,
@@ -283,7 +285,8 @@ for a_index in surf_angle_index[1:]:
 
     child_cutting = ' \n'.join([
         child_cutting,
-        'Z.5 \n/M29 \nZ2 \nY{:.10f} \nZ{:.10f} \n/M26 \n'.format(
+        '/M29 \nZ{:.10f} \nY{:.10f} \nZ{:.10f} \n/M26 \n'.format(
+            introOutro[1][int(a_index)] + 2,
             surf[-1][0]+.5,
             introOutro[3][int(a_index)])
     ])
@@ -297,7 +300,7 @@ child_footer = '\n ( CLOSEOUT BLOCKS ) \n#506 = #506 + 1\nM99 \n'
 child_text = [child_header, child_cutting, child_footer]
 main_text = [header_blocks, cutting_blocks, closeout_blocks]
 
-main_out = open(ncmainoutfile, 'a+')  # designate the output file
+main_out = open(ncmainoutfile, 'w+')  # designate the output file
 
 main_out.writelines(main_text)
 child_out.writelines(child_footer)
