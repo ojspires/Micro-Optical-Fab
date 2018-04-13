@@ -17,7 +17,7 @@
 # - Gathered the initial variable declarations
 # - TODOne: make the nozzle a variable which can be set from the main file
 # - TODO: further shorten the spray nozzle time (speed up the between-passes translation time)
-# - TODO: make the offset slot a variable
+# - TODOne: make the offset slot a variable
 # - TODO: tie the offset slot variable to filename (this is an iffy proposal)
 # - TODO: provide a dialog box with radio buttons to select the offset slot (this might be a better option)
 # Features (1.1.2, 2/5/2018):
@@ -32,6 +32,9 @@
 # - Created looping function, to cycle through all available child files
 # - put the nozzle code in a variable, to allow changing it from the Main file
 # - Enabled M26.x mist codes (M26.1 = M26, M26.2 = M27)
+# Features (1.2.1, 4/13/2018):
+# - Repaired the offset slot variable
+
 
 # Setup
 
@@ -170,6 +173,7 @@ for child in nc_child_filepaths:
 ncmaininfile = open(ncmainfilename+".original", 'r')
 ncmainoutfile = open(ncmainfilename, 'a+')
 tool_search = re.compile("T\d*[^0000]")
+offset_search = re.compile('G5[4-9]')
 rc_subroutine = sf_subroutine = fc_subroutine = False
 for line in ncmaininfile:
 
@@ -208,7 +212,7 @@ for line in ncmaininfile:
     elif "SET Y AXIS TO ZERO" in line:        # The script won't take as long if we don't have to translate to ymax
         line = line.replace("Y0.0", "Y" + y_parking_position)
     elif line.startswith("G71"):
-        line = line.replace("G54", "G[#548]")   # This doesn't work for other G5x offsets. rewrite here.
+        line = line.replace(offset_search.findall(line)[0], "G[#548]")
     elif tool_line:
         line = line + "B0 \n"
     elif line.startswith("#504"):
