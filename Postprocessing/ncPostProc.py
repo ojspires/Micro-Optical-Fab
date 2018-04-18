@@ -1,4 +1,4 @@
-# ncPostProc.py	1.1.1
+# ncPostProc.py	1.2.1
 # Oliver Spires		University of Arizona Micro-Optical Fabrication Facility	11/2/2017
 # This script performs post-processing on *.nc files produced by NanoCAM 2D V 1.52.00.
 # Features (1.0):
@@ -34,12 +34,13 @@
 # - Enabled M26.x mist codes (M26.1 = M26, M26.2 = M27)
 # Features (1.2.1, 4/13/2018):
 # - Repaired the offset slot variable
-
+# Features (1.2.2, 4/18/2018):
+# - Changed the mechanism for finding where to put the B0 line (finding the tool offset activation line)
+# - Changed the if statement for placing the parking position and mist variables' definition lines, to avoid duplicate declarations
+# - Removed the variable from the G54-G59 offsets; variables don't work in this G code
+# - Gathered some more of the variable declarations and gathered the if statements for the child file(s)
 
 # Setup
-
-# reset -f      # doesn't work outside of Jupyter Notebook
-# import tkinter
 from tkinter import filedialog
 import shutil
 import re
@@ -53,8 +54,10 @@ mist_updated = False
 mist_num = [26, 26, 26]
 nc_child_filenames = ['', '', '']
 nc_child_filepaths = ['', '', '']
-mist_search = re.compile("M2[678][.]?\d?\d?")
-child_index = 0
+mist_search = re.compile('M2[678][.]?\d?\d?')
+offset_search = re.compile('G5[4-9]')
+rc_subroutine = sf_subroutine = fc_subroutine = False
+child_index = -1
 b_axis_installed = True
 
 if b_axis_installed:
@@ -92,14 +95,15 @@ mnfile.close()
 shutil.move(ncmainfilename, ncmainfilename + ".original")
 
 
-# Scan the Child file to determine spindle direction
+
 
 for child in nc_child_filepaths:
     print(child)
-    mist_one = False
-    mist_two = False
-    mist_all = False
+    mist_one = mist_two = mist_all = False
+    child_index += 1
     if child is not '':
+
+        # Scan the Child file to determine spindle direction and mist code
         for line in open(child):
             if line == 'M03S[#504]\n':
                 direction = ''  # CW
@@ -124,16 +128,10 @@ for child in nc_child_filepaths:
             mist_num[child_index] = 27
         if mist_all:
             mist_num[child_index] = 28
+        # print(mist_num)
 
-        child_index += 1
-    else:
-        child_index += 1
-    # print(mist_num)
+        # Modify the child file(s)
 
-
-# Modify the child file(s)
-
-    if child is not '':
         # Back up the original files
         shutil.move(child, child + ".original")
 
@@ -172,9 +170,6 @@ for child in nc_child_filepaths:
 
 ncmaininfile = open(ncmainfilename+".original", 'r')
 ncmainoutfile = open(ncmainfilename, 'a+')
-tool_search = re.compile("T\d*[^0000]")
-offset_search = re.compile('G5[4-9]')
-rc_subroutine = sf_subroutine = fc_subroutine = False
 for line in ncmaininfile:
 
     # Set the X offset for cylinder cutting files
@@ -182,38 +177,28 @@ for line in ncmaininfile:
         if line == "#506 = 0                                 ( LOOP COUNT )\n":
             line = line + "#545 = " + direction + "[#542]*[#541]                     ( X cut offset var )\n"
 
-    # Check if this is the Tool Offset setting line
-    try:
-        tool_num = tool_search.findall(line[0:4])[0]
-        tool_line = True
-        print(tool_num)
-    except IndexError:
-        tool_line = False
-        pass
-    else:
-        continue
-
     # Do the replacements
-    if line.startswith("#547"):               # The script won't take as long if we don't have to translate all the way to z = 0. Make variable the offset; this can later be tied to filename or tool # or something
+    if "SECTION COMMANDS" in line:               # The script won't take as long if we don't have to translate all the way to z = 0. Make variable the offset; this can later be tied to filename or tool # or something
 
-        line = "#546 = " + z_parking_position + "                               ( Set Parking Position )\n" + line + "#548 = 54                                ( Set offset number.      Acceptable = 54 to 59 )\n#563 = " + \
-                str(mist_num[2]) + \
-               "                                ( Set mist number for FC. Acceptable = 26 to 28 ) \n"
+        line = "#546 = " + z_parking_position + "                                ( Set Parking Position )\n#563 = " + \
+            str(mist_num[2]) + \
+            "                                ( Set mist number for FC. Acceptable = 26 to 28 ) \n" + line
+        # Removed:      \n#548 = 54                                ( Set offset number.      Acceptable = 54 to 59 )    Variables don't work in G commands (at least not in this one)
     elif line.startswith("#524"):
         line = line + "#561 = " + \
-                str(mist_num[0]) + \
-               "                                ( Set mist number for RC. Acceptable = 26 to 28 ) \n"
+            str(mist_num[0]) + \
+            "                                ( Set mist number for RC. Acceptable = 26 to 28 ) \n"
     elif line.startswith("#534"):
         line = line + "#562 = " + \
-                str(mist_num[1]) + \
-               "                                ( Set mist number for RC. Acceptable = 26 to 28 ) \n"
+            str(mist_num[1]) + \
+            "                                ( Set mist number for RC. Acceptable = 26 to 28 ) \n"
     elif "PARKING POSITION" in line:          # Make the parking position a variable
         line = line.replace(" Z0.0 F200   ", " Z[#546] F200")
     elif "SET Y AXIS TO ZERO" in line:        # The script won't take as long if we don't have to translate to ymax
         line = line.replace("Y0.0", "Y" + y_parking_position)
-    elif line.startswith("G71"):
-        line = line.replace(offset_search.findall(line)[0], "G[#548]")
-    elif tool_line:
+    # elif line.startswith("G71"):
+    #     line = line.replace(offset_search.findall(line)[0], "G[#548]")
+    elif "( ACTIVATE TOOL OFFSET" in line:
         line = line + "B0 \n"
     elif line.startswith("#504"):
         if rc_subroutine:
