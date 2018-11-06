@@ -70,34 +70,60 @@ halvingArray = np.logspace(0, -10, num=25, endpoint=True, base=5)
 for step in halvingArray:
     stepArray.append(stepArray[-1] + step)
 applicableSize = np.size(applicableRows, 0)
+# for row_index_calc in rowIndices:
+#     percent = (rowIndices.index(row_index_calc)) / applicableSize
+#     hashes = '#' * int(round(percent * bar_length))
+#     spaces = ' ' * (bar_length - len(hashes))
+#     sys.stdout.write("\rProcessing Output:   [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
+#     sys.stdout.flush()
+#     lRise = (surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]-1] -
+#              surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]-2])
+#     rRise = (surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][3]+2] -
+#              surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][3]+1])
+#     # print(applicableRows[rowIndices.index(row_index_calc)])
+#     # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2]-2):(applicableRows[rowIndices.index(row_index_calc)][2]+1)])
+#     surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]:
+#                          (applicableRows[rowIndices.index(row_index_calc)][2] + 25)] = \
+#         [i * lRise + surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2] - 1] for i in stepArray[1:]]
+#     # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2]-2):(applicableRows[rowIndices.index(row_index_calc)][2]+1)])
+#     stepArray.reverse()
+#     surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][3] - 24):
+#                          applicableRows[rowIndices.index(row_index_calc)][3]+1] = \
+#         [i * -rRise + surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][3] + 1] for i in stepArray[0:-1]]
+#     stepArray.reverse()
+#     # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 24):(applicableRows[rowIndices.index(row_index_calc)][3] - 24)])
+#     surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 25):
+#                          (applicableRows[rowIndices.index(row_index_calc)][3] - 24)] = \
+#         [surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 24)]] * \
+#         np.size(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 25):
+#                                      (applicableRows[rowIndices.index(row_index_calc)][3] - 24)])
+#     # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 24):(applicableRows[rowIndices.index(row_index_calc)][3] - 24)])
+
 for row_index_calc in rowIndices:
     percent = (rowIndices.index(row_index_calc)) / applicableSize
     hashes = '#' * int(round(percent * bar_length))
     spaces = ' ' * (bar_length - len(hashes))
     sys.stdout.write("\rProcessing Output:   [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
     sys.stdout.flush()
-    lRise = (surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]-1] -
-             surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]-2])
-    rRise = (surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][3]+2] -
-             surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][3]+1])
-    # print(applicableRows[rowIndices.index(row_index_calc)])
-    # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2]-2):(applicableRows[rowIndices.index(row_index_calc)][2]+1)])
-    surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]:
-                         (applicableRows[rowIndices.index(row_index_calc)][2] + 25)] = \
-        [i * lRise + surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2] - 1] for i in stepArray[1:]]
-    # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2]-2):(applicableRows[rowIndices.index(row_index_calc)][2]+1)])
-    stepArray.reverse()
-    surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][3] - 24):
-                         applicableRows[rowIndices.index(row_index_calc)][3]+1] = \
-        [i * -rRise + surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][3] + 1] for i in stepArray[0:-1]]
-    stepArray.reverse()
-    # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 24):(applicableRows[rowIndices.index(row_index_calc)][3] - 24)])
-    surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 25):
-                         (applicableRows[rowIndices.index(row_index_calc)][3] - 24)] = \
-        [surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 24)]] * \
-        np.size(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 25):
-                                     (applicableRows[rowIndices.index(row_index_calc)][3] - 24)])
-    # print(surf[row_index_calc][(applicableRows[rowIndices.index(row_index_calc)][2] + 24):(applicableRows[rowIndices.index(row_index_calc)][3] - 24)])
+    print(row_index_calc)
+    col_count = np.size(surf, 1) + applicableRows[rowIndices.index(row_index_calc)][3] + 1
+    span = int(np.ceil(np.size(col_count)/2))
+    col_indices = np.linspace(applicableRows[rowIndices.index(row_index_calc)][2], col_count, col_count)
+    col_indices = list(col_indices)
+    for col_index_calc in col_indices[:span]:
+        col_index_calc = int(col_index_calc)
+        surf[row_index_calc][col_index_calc] = np.average([surf[row_index_calc - 1][col_index_calc - 1],
+                                                           surf[row_index_calc - 1][col_index_calc + 1],
+                                                           surf[row_index_calc - 1][col_index_calc],
+                                                           surf[row_index_calc][col_index_calc - 1]])
+    col_indices.reverse()
+    for col_index_calc in col_indices[:span]:
+        col_index_calc = int(col_index_calc)
+        surf[row_index_calc][col_index_calc] = np.average([surf[row_index_calc - 1][col_index_calc - 1],
+                                                           surf[row_index_calc - 1][col_index_calc + 1],
+                                                           surf[row_index_calc - 1][col_index_calc],
+                                                           surf[row_index_calc][col_index_calc + 1]])
+    # surf[row_index_calc][applicableRows[rowIndices.index(row_index_calc)][2]:(applicableRows[rowIndices.index(row_index_calc)][2] + 25)]
 
 with open(rtzfilename[:-4] + '.out' + rtzfilename[-4:], 'w', newline='') as csvfile:
     spamwriter = csv.writer(csvfile, delimiter=',',

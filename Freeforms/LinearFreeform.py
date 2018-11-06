@@ -1,38 +1,49 @@
+#!C:\Program Files\Python36\python.exe
 # LinearFreeform.py   Oliver Spires   5/10/18
 # This program takes an XYZ freeform profile from a .csv, and generates GCODE to cut a straight-line toolpath which
 # follows that profile.
-# TODO: this code is still unmodified from its inspiration, RadialToolpath.py
+# TODOne: this code is still unmodified from its inspiration, RadialToolpath.py
+# TODOne: Only the X=5.0000 is showing up. troubleshoot.
+# Edit 11/5-11/6/2018: Code didn't work on second run of target part. Edited to repair.
 
+# Import Modules:
+from typing import List, Any
 import numpy as np
 import tkinter
 from tkinter import filedialog
 # import matplotlib.pyplot as plt
 from datetime import datetime as dt
 import csv
-import copy
+# import copy
 import sys
-
+import random
 
 # Set up variables, in mm
-cut_spacing = .0015
-grating_DoC = .001
+cut_spacing = .005
+grating_DoC = .005
 tangent_arc_radius = 60
 half_diameter = 5
-feed_rate = 2000
-tool_radius = .05
+feed_rate = 800
+tool_radius = .097621
 bar_length = 60
 now = dt.now()
 in_out_length = .05
+l_junk = 0
+r_junk = 0
+totes_junk = -0.84609787
+debug = True
+ranFin = ['Done.','Donezo.','Fin.','Finite Incantatum.','The End.']
 
 
+# Define Functions
 def radius_calc(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float) -> tuple:
-    ma = (y2-y1)/(x2-x1)
-    mb = (y3-y2)/(x3-x2)
+    ma = (y2 - y1) / (x2 - x1)
+    mb = (y3 - y2) / (x3 - x2)
     if ma == 0 or mb == ma:
         radius = 'inf'
         y_center = 'inf'
     else:
-        x_center = (ma * mb * (y1 - y3) + mb * (x1 + x2) - ma * (x2 + x3))/(2 * (mb - ma))
+        x_center = (ma * mb * (y1 - y3) + mb * (x1 + x2) - ma * (x2 + x3)) / (2 * (mb - ma))
         y_center = -(1 / ma) * (x_center - (x1 + x2) / 2) + (y1 + y2) / 2
         radius = np.sqrt(np.square(x1 - x_center) + np.square(y1 - y_center))
     return radius, y_center
@@ -46,126 +57,186 @@ def tool_offset_calc(slope, t_radius):
     return offsets
 
 
+def surf_offset_calc(row_func, x_row_func, x_index_func, left_junk_data, right_junk_data, local_x_func, part_radius):
+    point_radius_func = np.sqrt(np.square(row_func[0]) + np.square(x_row_func[int(x_index_func)]))
+    if (row_func[int(x_index_func)] == left_junk_data
+        or row_func[int(x_index_func)] == right_junk_data) \
+            and point_radius_func >= part_radius:
+        local_slope_func = 0
+        local_radius_func: List[Any] = ['inf', 'inf']
+    elif (x_index_func == 1
+          and row_func[int(x_index_func)] != left_junk_data) \
+            or (row_func[int(x_index_func) - 1] == left_junk_data
+                and point_radius_func >= part_radius * .9
+                and row_func[int(x_index_func)] != left_junk_data):
+        local_slope_func = (row_func[int(x_index_func) + 1] - row_func[int(x_index_func)]) / local_x_func
+        local_radius_func: List[Any] = ['inf', 'inf']
+    elif (row_func[int(x_index_func)] == row_func[-1]
+          and row_func[int(x_index_func)] != right_junk_data) \
+            or (row_func[int(x_index_func) + 1] == right_junk_data
+                and point_radius_func >= part_radius * .9
+                and row_func[int(x_index_func)] != left_junk_data):
+        local_slope_func = (row_func[int(x_index_func)] - row_func[int(x_index_func) - 1]) / local_x_func
+        local_radius_func: List[Any] = ['inf', 'inf']
+    else:
+        local_slope_func = (row_func[int(x_index_func) + 1] - row_func[int(x_index_func) - 1]) / (2 * local_x_func)
+        local_radius_func = list(radius_calc(-local_x_func, row_func[int(x_index_func) - 1], 0,
+                                             row_func[int(x_index_func)], local_x_func,
+                                             row_func[int(x_index_func) + 1]))
+    (local_x_offset_func, local_y_offset_func) = tool_offset_calc(local_slope_func, tool_radius)
+    return local_slope_func, local_radius_func[0], -local_x_offset_func + x_row_func[
+        int(x_index_func)], -local_y_offset_func + row_func[int(x_index_func)]
+
+
 # Import the file
 root = tkinter.Tk()
-rtzfilename = filedialog.askopenfilename(initialdir="/", title="Select surface R-theta-Z .csv file", filetypes=(
-    ("R-theta-Z .CSV Files", "*.csv"), ("all files", "*.*")))
-rtzpath = rtzfilename.split("/")[0:-1]  # Take the path from the RTZ file
-rtzpath = '/'.join(rtzpath)  # Rejoin it into a single string
+xyz_filename = filedialog.askopenfilename(initialdir="/", title="Select surface XYZ .csv file", filetypes=(
+    ("XYZ .CSV Files", "*.csv"), ("all files", "*.*")))
+xyz_path = xyz_filename.split("/")[0:-1]  # Take the path from the RTZ file
+xyz_path = '/'.join(xyz_path)  # Rejoin it into a single string
 surf = []
-surfrow = []
+surf_row = []
 
 minimum_radius = 10000
-with open(rtzfilename, newline='') as csvfile:
-    csvreader = csv.reader(csvfile, delimiter=',', quotechar='|')
-    for row in csvreader:
+with open(xyz_filename, newline='') as csv_file:
+    csv_reader = csv.reader(csv_file, delimiter=',', quotechar='|')
+    for row in csv_reader:
         for col in row:
-            surfrow.append(float(col))
-        surf.append(surfrow)
-        surfrow = []
+            if col!='':
+                surf_row.append(float(col))
+        surf.append(surf_row)
+        surf_row = []
     # print(surf[0][0:10])
     # print(surf[1][0:10])
-angular_resolution = surf[0][2] - surf[0][1]
-radius_resolution = surf[2][0] - surf[1][0]
-surf_slope = copy.deepcopy(surf)
-surf_radius_index = np.linspace(0, np.size(surf, 0) - 1, np.size(surf, 0))
-surf_angle_index = np.linspace(0, np.size(surf, 1) - 1, np.size(surf, 1))
-introOutro = np.zeros((4, np.size(surf, 1)))
-for r_index in surf_radius_index[1:]:
+x_resolution = surf[0][2] - surf[0][1]
+y_resolution = surf[2][0] - surf[1][0]
+surf = np.rot90(surf)
+root.destroy()
+surf_slope = [[0 for x in range(np.size(surf, 1))] for y in range(np.size(surf, 0))]
+surf_y_index = np.linspace(0, np.size(surf, 0) - 1, np.size(surf, 0))
+surf_x_index = np.linspace(0, np.size(surf, 1) - 1, np.size(surf, 1))
+junk_rows = []
+
+for y_index in surf_y_index[:-1]:
     # Progress bar:
-    percent = float(r_index) / surf_radius_index[-1]
+    percent = float(y_index) / surf_y_index[-1]
     hashes = '#' * int(round(percent * bar_length))
     spaces = ' ' * (bar_length - len(hashes))
     sys.stdout.write("\rProcessing slopes and offsets:   [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
     sys.stdout.flush()
-    # print(r_index)
-    # print(surf_slope[int(r_index)][1])
-    local_x = float(np.radians(angular_resolution) * surf[int(r_index)][0])
-    local_slope = (surf[int(r_index)][2] - surf[int(r_index)][-1]) / (2 * local_x)
-    # print(local_slope)
-    local_radius = list(radius_calc(-local_x, surf[int(r_index)][-1], 0, surf[int(r_index)][1], local_x, surf[int(r_index)][2]))
-    if local_radius[0] != 'inf':
-        if local_radius[1] < surf[int(r_index)][1]:
-            local_radius[0] = 'inf'
-        else:
-            minimum_radius = np.min((local_radius[0], minimum_radius))
-    (local_x_offset, local_y_offset) = tool_offset_calc(local_slope, tool_radius)
-    # if np.abs(local_x_offset) > local_x:  # pushover attempt
-    #     local_x_offset = np.sign(local_x_offset) * local_x
-    #     local_y_offset = np.sqrt(np.square(tool_radius) - np.square(local_x))
-    # print(local_x_offset)
-    # print(local_y_offset)
-    surf_slope[int(r_index)][1] = [local_slope, local_radius[0], local_x_offset, local_y_offset + surf[int(r_index)][1]]
-    # print(surf_slope[int(r_index)][1])
-    # print(surf[int(r_index)][1])
-    # print(surf[int(r_index)][-2])
-    local_slope = (surf[int(r_index)][1] - surf[int(r_index)][-2]) / (2 * local_x)
-    local_radius = list(radius_calc(-local_x, surf[int(r_index)][-2], 0, surf[int(r_index)][-1], local_x, surf[int(r_index)][1]))
-    if local_radius[0] != 'inf':
-        if local_radius[1] < surf[int(r_index)][1]:
-            local_radius[0] = 'inf'
-        else:
-            minimum_radius = np.min((local_radius[0], minimum_radius))
-    (local_x_offset, local_y_offset) = tool_offset_calc(local_slope, tool_radius)
-    # if np.abs(local_x_offset) > local_x:  # pushover attempt
-    #     local_x_offset = np.sign(local_x_offset) * local_x
-    #     local_y_offset = np.sqrt(np.square(tool_radius) - np.square(local_x))
-    surf_slope[int(r_index)][-1] = [local_slope, local_radius[0], local_x_offset, local_y_offset + surf[int(r_index)][-1]]
-    for a_index in surf_angle_index[2:-1]:
-        # print(surf[0][int(a_index)])
-        local_slope = (surf[int(r_index)][int(a_index) + 1] - surf[int(r_index)][int(a_index) - 1]) / (2 * local_x)
-        local_radius = list(radius_calc(-local_x, surf[int(r_index)][int(a_index) - 1], 0, surf[int(r_index)][int(a_index)], local_x, surf[int(r_index)][int(a_index) + 1]))
-        if local_radius[0] != 'inf':
-            if local_radius[1] < surf[int(r_index)][1]:
-                local_radius[0] = 'inf'
-            else:
-                minimum_radius = np.min((local_radius[0], minimum_radius))
-        (local_x_offset, local_y_offset) = tool_offset_calc(local_slope, tool_radius)
-        # if np.abs(local_x_offset) > local_x:  # pushover attempt
-        #     local_x_offset = np.sign(local_x_offset) * local_x
-        #     local_y_offset = np.sqrt(np.square(tool_radius) - np.square(local_x))
-        surf_slope[int(r_index)][int(a_index)] = [local_slope, local_radius[0], local_x_offset, local_y_offset + surf[int(r_index)][int(a_index)]]
+    if surf[int(y_index)][1] == totes_junk:
+        junk_rows.append(y_index)
+        continue
+    for x_index in surf_x_index[1:]:
+        surf_slope[int(y_index)][int(x_index)] = surf_offset_calc(surf[int(y_index)], surf[-1], x_index, l_junk, r_junk,
+                                                                  x_resolution, half_diameter)
+        # print(surf_slope[int(y_index)][int(x_index)])
+        if surf_slope[int(y_index)][int(x_index)][1] != 'inf':
+            minimum_radius = np.min((surf_slope[int(y_index)][int(x_index)][1], minimum_radius))
 
-        # print(surf_slope[int(r_index)][int(a_index)])
-    # print(surf_slope[int(r_index)][0:10])
-    # print(surf_slope[int(r_index)][-10:-1])
-    for a_index in surf_angle_index[1:]:
+surf = np.delete(surf, np.array(junk_rows), 0)
+surf_y_index = np.linspace(0, np.size(surf, 0) - 1, np.size(surf, 0))
+introOutro = np.zeros((4, np.size(surf, 1)))
+print('\n')
+if debug:
+    in_out_choice = np.zeros((2, np.size(surf, 1)))
+
+for y_index in surf_y_index[:-1]:
+    # Progress bar:
+    percent = float(y_index) / surf_y_index[-1]
+    hashes = '#' * int(round(percent * bar_length))
+    spaces = ' ' * (bar_length - len(hashes))
+    sys.stdout.write("\rProcessing in/out coordinates:   [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
+    sys.stdout.flush()
+
+    for x_index in surf_x_index[1:]:
+        point_radius = np.sqrt(np.square(surf[int(y_index)][0]) + np.square(surf[-1][int(x_index)]))
+        if (point_radius < half_diameter * .9 or point_radius > half_diameter * 1.1) and y_index != surf_y_index[-2]:
+            continue
         # Tangent lead-in and lead-out points calculation:
-        if r_index == 2:
+        if y_index == 1 and surf[0][int(x_index)] != 0:
             # index 0:1 Out, index 2:3 In
             #     print(surf_slope[int(r_index)][int(a_index)])
             #     print(a_index)
-            x_out_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * -in_out_length + surf_slope[int(r_index-1)][int(a_index)][2]
-            z_out_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * -in_out_length + surf_slope[int(r_index-1)][int(a_index)][3]
-            introOutro[0][int(a_index)] = x_out_point
-            introOutro[1][int(a_index)] = z_out_point
-        if r_index == surf_radius_index[-1]:
-            x_in_point = (surf_slope[int(r_index)][int(a_index)][2] - surf_slope[int(r_index-1)][int(a_index)][2]) / radius_resolution * in_out_length + surf_slope[int(r_index)][int(a_index)][2]
-            z_in_point = (surf_slope[int(r_index)][int(a_index)][3] - surf_slope[int(r_index-1)][int(a_index)][3]) / radius_resolution * in_out_length + surf_slope[int(r_index)][int(a_index)][3]
-            introOutro[2][int(a_index)] = x_in_point
-            introOutro[3][int(a_index)] = z_in_point
-root.destroy()
+            introOutro[0][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][2] -
+                                           surf_slope[int(y_index - 1)][int(x_index)][2]) / \
+                                           x_resolution * -in_out_length + surf_slope[int(y_index - 1)][int(x_index)][2]
+            introOutro[1][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][3] -
+                                           surf_slope[int(y_index - 1)][int(x_index)][3]) / \
+                                           y_resolution * -in_out_length + surf_slope[int(y_index - 1)][int(x_index)][3]
+            if debug:
+                in_out_choice[1][int(x_index)] = 1
+        elif y_index == surf_y_index[-2] and surf[int(y_index)][int(x_index)] != 0:
+            introOutro[2][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][2] -
+                                           surf_slope[int(y_index - 1)][int(x_index)][2]) / \
+                                           x_resolution * in_out_length + surf_slope[int(y_index)][int(x_index)][2]
+            introOutro[3][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][3] -
+                                           surf_slope[int(y_index - 1)][int(x_index)][3]) / \
+                                           y_resolution * in_out_length + surf_slope[int(y_index)][int(x_index)][3]
+            if debug:
+                in_out_choice[0][int(x_index)] = 2
+        elif surf[int(y_index)][int(x_index)] != 0 and surf[int(y_index) - 1][int(x_index)] == 0:
+            if surf[int(y_index) - 1][int(x_index)] == 0 and surf[int(y_index) + 1][int(x_index)] == 0:
+                x_out_point = x_in_point = surf_slope[int(y_index)][int(x_index)][2]
+                z_out_point = z_in_point = surf_slope[int(y_index)][int(x_index)][3]
+                introOutro[0][int(x_index)] = introOutro[2][int(x_index)] = x_out_point
+                introOutro[1][int(x_index)] = introOutro[3][int(x_index)] = z_out_point
+                if debug:
+                    in_out_choice[0][int(x_index)] = in_out_choice[1][int(x_index)] = 3
+            else:
+                x_out_point = (surf_slope[int(y_index) + 1][int(x_index)][2] -
+                               surf_slope[int(y_index)][int(x_index)][2]) / \
+                               y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][2]
+                z_out_point = (surf_slope[int(y_index) + 1][int(x_index)][3] -
+                               surf_slope[int(y_index)][int(x_index)][3]) / \
+                               y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][3]
+                introOutro[0][int(x_index)] = x_out_point
+                introOutro[1][int(x_index)] = z_out_point
+                if debug:
+                    in_out_choice[1][int(x_index)] = 4
+        elif surf[int(y_index)][int(x_index)] != 0 and surf[int(y_index) + 1][int(x_index)] == 0:
+            x_in_point = surf_slope[int(y_index)][int(x_index)][2] + (surf_slope[int(y_index)][int(x_index)][2] -
+                         surf_slope[int(y_index) - 1][int(x_index)][2]) / y_resolution * in_out_length
+            z_in_point = surf_slope[int(y_index)][int(x_index)][3] + (surf_slope[int(y_index)][int(x_index)][3] -
+                         surf_slope[int(y_index) - 1][int(x_index)][3]) / y_resolution * in_out_length
+            introOutro[2][int(x_index)] = x_in_point
+            introOutro[3][int(x_index)] = z_in_point
+            if debug:
+                in_out_choice[0][int(x_index)] = 5
+
 # print(surf_slope[1][0])
 
 # For calculation of whether the tool will clear or not: compare required X offset for coordinate (based on local slope)
 # to arclength and neighboring X offsets
 
-print('\nMinimum tool radius:             {:.4f}'.format(minimum_radius))
+print('\nMaximum tool radius:             {:.4f}mm'.format(minimum_radius))
 
 # Surface finish estimation
-outerEdgeRadius = surf[-1][0]
-innerEdgeRadius = surf[1][0]
-outerEdgeArc = np.deg2rad(angular_resolution) * outerEdgeRadius
-innerEdgeArc = np.deg2rad(angular_resolution) * innerEdgeRadius
+outerEdgeRadius = surf[-2][0]
+innerEdgeRadius = surf[0][0]
+outerEdgeArc = x_resolution
+innerEdgeArc = x_resolution
 inE = innerEdgeArc / 2
 outE = outerEdgeArc / 2
 
-practicalInnerSurF = 12.4109 + 4.0529/innerEdgeArc + .2317*innerEdgeArc**2/(8*tool_radius)
-practicalOuterSurF = 12.4109 + 4.0529/outerEdgeArc + .2317*outerEdgeArc**2/(8*tool_radius)
-innerEdgeSurfaceFinish = np.sqrt((1 / innerEdgeArc) * np.square(tool_radius) * ((-inE * np.sqrt(1 - (np.square(inE) / np.square(tool_radius))) + tool_radius * np.arcsin(-inE / tool_radius)) - (inE * np.sqrt(1 - (np.square(inE) / np.square(tool_radius))) + tool_radius * np.arcsin(inE / tool_radius)) + (inE - np.power(inE, 3)/(3 * np.square(tool_radius))) - (-inE - np.power(-inE, 3)/(3 * np.square(tool_radius))) + 2 * inE))
-outerEdgeSurfaceFinish = np.sqrt((1 / outerEdgeArc) * np.square(tool_radius) * ((-outE * np.sqrt(1 - (np.square(outE) / np.square(tool_radius))) + tool_radius * np.arcsin(-outE / tool_radius)) - (outE * np.sqrt(1 - (np.square(outE) / np.square(tool_radius))) + tool_radius * np.arcsin(outE / tool_radius)) + (outE - np.power(outE, 3)/(3 * np.square(tool_radius))) - (-outE - np.power(-outE, 3)/(3 * np.square(tool_radius))) + 2 * outE))
-print('Predicted inner surface finish: ', innerEdgeSurfaceFinish * 10**6, 'nmRMS')
-print('Predicted outer surface finish: ', outerEdgeSurfaceFinish * 10**6, 'nmRMS')
+practicalInnerSurF = 12.4109 + 4.0529 / innerEdgeArc + .2317 * innerEdgeArc ** 2 / (8 * tool_radius)
+practicalOuterSurF = 12.4109 + 4.0529 / outerEdgeArc + .2317 * outerEdgeArc ** 2 / (8 * tool_radius)
+innerEdgeSurfaceFinish = np.sqrt((1 / innerEdgeArc) * np.square(tool_radius) *
+                                 ((-inE * np.sqrt(1 - (np.square(inE) / np.square(tool_radius))) +
+                                   tool_radius * np.arcsin(-inE / tool_radius)) -
+                                  (inE * np.sqrt(1 - (np.square(inE) / np.square(tool_radius))) +
+                                   tool_radius * np.arcsin(inE / tool_radius)) +
+                                  (inE - np.power(inE, 3) / (3 * np.square(tool_radius))) -
+                                  (-inE - np.power(-inE, 3) / (3 * np.square(tool_radius))) + 2 * inE))
+outerEdgeSurfaceFinish = np.sqrt((1 / outerEdgeArc) * np.square(tool_radius) *
+                                 ((-outE * np.sqrt(1 - (np.square(outE) / np.square(tool_radius))) +
+                                   tool_radius * np.arcsin(-outE / tool_radius)) -
+                                  (outE * np.sqrt(1 - (np.square(outE) / np.square(tool_radius))) +
+                                   tool_radius * np.arcsin(outE / tool_radius)) +
+                                  (outE - np.power(outE, 3) / (3 * np.square(tool_radius))) -
+                                  (-outE - np.power(-outE, 3) / (3 * np.square(tool_radius))) + 2 * outE))
+print('Predicted inner surface finish: ', innerEdgeSurfaceFinish * 10 ** 6, 'nmRMS')
+print('Predicted outer surface finish: ', outerEdgeSurfaceFinish * 10 ** 6, 'nmRMS')
 print('Practical inner surface finish: ', practicalInnerSurF, 'nmRMS')
 print('Practical outer surface finish: ', practicalOuterSurF, 'nmRMS')
 
@@ -186,9 +257,8 @@ print('Practical outer surface finish: ', practicalOuterSurF, 'nmRMS')
 Tool Path Code Section
 """
 
-
-ncmainoutfile = rtzfilename + ' Blazed Grating Main.nc'
-ncchildfile = rtzfilename + ' Blazed Grating Child.nc'
+ncmainoutfile = xyz_filename + ' Blazed Grating Main.nc'
+ncchildfile = xyz_filename + ' Blazed Grating Child.nc'
 
 header_blocks = '( File generated by RadialToolpath.py by Oliver Spires / ojspires@email.arizona.edu / 850-240-1897 ) \n( on: ' \
                 + str(now)[:19] + \
@@ -205,18 +275,19 @@ closeout_blocks = '\n( CLOSEOUT BLOCKS ) \nM79 \nM29 \nG52 \nG53 Z-180 F[#543] \
 # plt.plot(profile_x[1:], profile_z[1:])
 # plt.show()
 # print(np.size(profile_x))     # Show the size of the profile lists
-profile_index = np.linspace(np.size(surf, 0) + 1, 1, np.size(surf, 0) + 1)  # reverse-order the indices
+profile_index = np.linspace(np.size(surf, 0) - 1, 0, np.size(surf, 0))  # reverse-order the indices
 # print(profile_index)
 cutting_blocks = ''  # Clear the cutting blocks and set it as a string so we can append the toolpath code
 child_cutting = ''
 # TODOne: nest this inside an angle loop
 
 child_out = open(ncchildfile, 'w+')
-child_header = '( ' + ncchildfile + ') \n( Called by ' + ncmainoutfile + ' ) \n( on: ' + str(now)[:19] + ' ) \n\n( LOOPING SETUP ) \n#547 = #547 - #542 \nG52 Z[#547] \n\n( CUTTING BLOCKS ) \n'
+child_header = '( ' + ncchildfile + ') \n( Called by ' + ncmainoutfile + ' ) \n( on: ' + str(now)[
+                                                                                         :19] + ' ) \n\n( LOOPING SETUP ) \n#547 = #547 - #542 \nG52 Z[#547] \n\n( CUTTING BLOCKS ) \n'
 child_out.writelines(child_header)
-for a_index in surf_angle_index[1:]:
+for x_index in surf_x_index[1:]:
     # Progress bar:
-    percent = float(a_index) / surf_angle_index[-1]
+    percent = float(x_index) / surf_x_index[-1]
     hashes = '#' * int(round(percent * bar_length))
     spaces = ' ' * (bar_length - len(hashes))
     sys.stdout.write("\rProcessing GCODE Output:         [{0}] {1}%".format(hashes + spaces, int(round(percent * 100))))
@@ -224,50 +295,83 @@ for a_index in surf_angle_index[1:]:
     child_cutting = ''
 
     for index in profile_index:
+        if surf[int(index)][int(x_index)] == 0 or index == profile_index[0]:
+            continue
+        elif surf[int(index)][int(x_index)] != 0 and index == 0:
+            child_cutting = ' \n'.join([child_cutting,
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
+                                            introOutro[0][int(x_index)],
+                                            -surf[int(index)][0] - in_out_length,
+                                            introOutro[1][int(x_index)])
+                                        ])
+            if debug:
+                child_cutting = ' '.join([child_cutting, '{:1f}'.format(in_out_choice[1][int(x_index)])])
+        elif surf[int(index)][int(x_index)] != 0 and surf[int(index) - 1][int(x_index)] == 0 and \
+                surf[int(index) + 1][int(x_index)] == 0:
+            child_cutting = ' \n'.join([child_cutting,
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f} \n/M26 \n'
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f} (Intro)\n'
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f} \n'
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
+                                            introOutro[2][int(x_index)],
+                                            -surf[int(index)][0] + in_out_length,
+                                            introOutro[3][int(x_index)] + 10,
 
-        # cutting_blocks = cutting_blocks + 'X' + str(profile_x[int(index)]) + ' Z' + str(profile_z[int(index)]) + ' \n'  # test
-        if index == 1:  # index = 1 is the last one due to the [:-1] when setting profile_index
-            # outro     TODOne: add Y and C coords    *implemented; test next
-            # child_cutting = child_cutting + 'C{:.10f}'.format(surf[0][int(a_index)]) + \  # old formatting. reformatted to try to improve speed.
-            #     ' X{:.10f}'.format(introOutro[2][int(a_index)]) + \
-            #     ' Y{:.10f}'.format(surf[1][0] - in_out_length) + \
-            #     ' Z{:.10f}'.format(introOutro[3][int(a_index)]) + ' \n'
-            child_cutting = ' \n'.join([child_cutting,
-                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
-                                            surf[0][int(a_index)],
-                                            introOutro[0][int(a_index)],
-                                            surf[1][0] - in_out_length,
-                                            introOutro[1][int(a_index)])
+                                            introOutro[2][int(x_index)],
+                                            -surf[int(index)][0] + in_out_length,
+                                            introOutro[3][int(x_index)],
+
+                                            surf_slope[int(index)][int(x_index)][2],
+                                            -surf[int(index)][0],
+                                            surf_slope[int(index)][int(x_index)][3],
+
+                                            introOutro[0][int(x_index)],
+                                            -surf[int(index)][0] - in_out_length,
+                                            introOutro[1][int(x_index)])
                                         ])
-            # print(str(index) + ' outro')
-        elif index == profile_index[0]:
-            # intro     TODOne: add Y and C coords    *implemented; test next
-            # child_cutting = child_cutting + 'C{:.10f}'.format(surf[0][int(a_index)]) + \    # old formatting. reformatted to try to improve speed.
-            #     ' X{:.10f}'.format(introOutro[2][int(a_index)]) + \
-            #     ' Y{:.10f}'.format(surf[-1][0] + in_out_length) + \
-            #     ' Z{:.10f}'.format(introOutro[3][int(a_index)]) + ' \n'
+            if debug:
+                child_cutting = ' '.join([child_cutting, '{:1f} {:1f}'.format(in_out_choice[0][int(x_index)],
+                                                                              in_out_choice[1][int(x_index)])])
+        elif surf[int(index)][int(x_index)] != 0 and ((surf[int(index) - 1][int(x_index)] == 0 and index - 1 == 0) or (surf[int(index) - 1][int(x_index)] == 0 and surf[int(index) - 2][int(x_index)] == 0)):
             child_cutting = ' \n'.join([child_cutting,
-                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f} (Intro)'.format(
-                                            surf[0][int(a_index)],
-                                            introOutro[2][int(a_index)],
-                                            surf[-1][0] + in_out_length,
-                                            introOutro[3][int(a_index)])
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
+                                            introOutro[0][int(x_index)],
+                                            -surf[int(index)][0] - in_out_length,
+                                            introOutro[1][int(x_index)])
                                         ])
-            # print(str(index) + ' intro')
+            if debug:
+                child_cutting = ' '.join([child_cutting, '{:1f}'.format(in_out_choice[1][int(x_index)])])
+        elif index == profile_index[1]:
+            child_cutting = ' \n'.join([child_cutting,
+                                        'Y{:.10f} \nZ{:.10f} \n/M26 \nC0 X{:.10f} Y{:.10f} Z{:.10f} (Intro)'.format(
+                                            -surf[int(index)][0] + in_out_length,
+                                            introOutro[3][int(x_index)],
+                                            introOutro[2][int(x_index)],
+                                            -surf[int(index)][0] + in_out_length,
+                                            introOutro[3][int(x_index)])
+                                        ])
+            if debug:
+                child_cutting = ' '.join([child_cutting, '{:1f}'.format(in_out_choice[0][int(x_index)])])
+        elif surf[int(index)][int(x_index)] != 0 and surf[int(index) + 1][int(x_index)] == 0:   # Test this elif stmt 11-5-18
+            child_cutting = ' \n'.join([child_cutting,
+                                        'Y{:.10f} \nZ{:.10f} \n/M26 \nC0 X{:.10f} Y{:.10f} Z{:.10f} (Intro)'.format(
+                                            -surf[int(index)][0] + in_out_length,
+                                            introOutro[3][int(x_index)],
+                                            introOutro[2][int(x_index)],
+                                            -surf[int(index)][0] + in_out_length,
+                                            introOutro[3][int(x_index)])
+                                        ])
+            if debug:
+                child_cutting = ' '.join([child_cutting, '{:1f}'.format(in_out_choice[0][int(x_index)])])
+
         else:
-            # main path     TODOne: add Y coords and change source variable(s).   *implemented. test next.
-            # child_cutting = child_cutting + 'C{:.10f}'.format(surf[0][int(a_index)]) + \    # old formatting. reformatted to try to improve speed.
-            #     ' X{:.10f}'.format(surf_slope[int(index - 1)][int(a_index)][2]) + \
-            #     ' Y{:.10f}'.format(surf[int(index - 1)][0]) + \
-            #     ' Z{:.10f}'.format(surf_slope[int(index - 1)][int(a_index)][3]) + ' \n'
             child_cutting = ' \n'.join([child_cutting,
-                                        'C{:.10f} X{:.10f} Y{:.10f} Z{:.10f}'.format(
-                                            surf[0][int(a_index)],
-                                            surf_slope[int(index - 1)][int(a_index)][2],
-                                            surf[int(index - 1)][0],
-                                            surf_slope[int(index - 1)][int(a_index)][3])
+                                        'C0 X{:.10f} Y{:.10f} Z{:.10f}'.format(
+                                            surf_slope[int(index)][int(x_index)][2],
+                                            -surf[int(index - 1)][0],
+                                            surf_slope[int(index)][int(x_index)][3])
                                         ])
-            # print(str(index) + ' surface')
+
         # start_x = profile_x[int(index)]  # Starting x coord     # TODOne: i don't think the rest of this loop's contents are necessary
         #    print(str(index))
         #    print(str(start_x) + ' ' + str(end_x))
@@ -285,13 +389,10 @@ for a_index in surf_angle_index[1:]:
 
     child_cutting = ' \n'.join([
         child_cutting,
-        '/M29 \nZ{:.10f} \nY{:.10f} \nZ{:.10f} \n/M26 \n'.format(
-            introOutro[1][int(a_index)] + 2,
-            surf[-1][0] + in_out_length,
-            introOutro[3][int(a_index)])
+        '/M29 \nZ{:.10f} \n'.format(introOutro[1][int(x_index)] + 2,)
     ])
 
-    child_out.writelines(child_cutting)     # writing out to the file after every angle saves a TON of time!!!
+    child_out.writelines(child_cutting)  # writing out to the file after every X saves a TON of time!!!
 # print(cutting_blocks)
 
 
@@ -301,8 +402,12 @@ child_text = [child_header, child_cutting, child_footer]
 main_text = [header_blocks, cutting_blocks, closeout_blocks]
 
 main_out = open(ncmainoutfile, 'w+')  # designate the output file
-
+print("\nWriting Main File...")
 main_out.writelines(main_text)
+print("Done with Main File. Writing Child File...")
 child_out.writelines(child_footer)
 main_out.close()
 child_out.close()
+
+random.shuffle(ranFin)
+print(ranFin[0])
