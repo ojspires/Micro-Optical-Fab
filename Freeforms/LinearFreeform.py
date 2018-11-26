@@ -5,6 +5,11 @@
 # TODOne: this code is still unmodified from its inspiration, RadialToolpath.py
 # TODOne: Only the X=5.0000 is showing up. troubleshoot.
 # Edit 11/5-11/6/2018: Code didn't work on second run of target part. Edited to repair.
+# Edit 11/14/2018: Repaired Outro 1 incorrect lead-out coordinates
+# TODO: Z(r=0) == 0 ==> intro/outro triggered (other points, i.e. r!=0, as well)
+# TODO: change default Z to 0, from -180
+# TODO: Z retracts just before final swipe (it's identical to what happens on the first swipe)
+
 
 # Import Modules:
 from typing import List, Any
@@ -19,20 +24,20 @@ import sys
 import random
 
 # Set up variables, in mm
-cut_spacing = .005
-grating_DoC = .005
+cut_spacing = .025
+grating_DoC = .025
 tangent_arc_radius = 60
 half_diameter = 5
 feed_rate = 800
-tool_radius = .097621
+tool_radius = 0.097588
 bar_length = 60
 now = dt.now()
-in_out_length = .05
+in_out_length = .5
 l_junk = 0
 r_junk = 0
 totes_junk = -0.84609787
 debug = True
-ranFin = ['Done.','Donezo.','Fin.','Finite Incantatum.','The End.']
+ranFin = ['Done.', 'Donezo.', 'Fin.', 'Finite Incantatum.', 'The End.']
 
 
 # Define Functions
@@ -78,6 +83,13 @@ def surf_offset_calc(row_func, x_row_func, x_index_func, left_junk_data, right_j
                 and row_func[int(x_index_func)] != left_junk_data):
         local_slope_func = (row_func[int(x_index_func)] - row_func[int(x_index_func) - 1]) / local_x_func
         local_radius_func: List[Any] = ['inf', 'inf']
+    elif row_func[int(x_index_func - 1)] == row_func[int(x_index_func + 1)] and not \
+            row_func[int(x_index_func - 1)] == row_func[int(x_index_func + 1)] == 0:            # Test this elif 11-16-18
+        local_slope_func = 0
+        print(x_index_func)
+        local_radius_func = list(radius_calc(-local_x_func, row_func[int(x_index_func) - 1], 0,
+                                             row_func[int(x_index_func)], local_x_func,
+                                             row_func[int(x_index_func) + 1]))
     else:
         local_slope_func = (row_func[int(x_index_func) + 1] - row_func[int(x_index_func) - 1]) / (2 * local_x_func)
         local_radius_func = list(radius_calc(-local_x_func, row_func[int(x_index_func) - 1], 0,
@@ -102,7 +114,7 @@ with open(xyz_filename, newline='') as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',', quotechar='|')
     for row in csv_reader:
         for col in row:
-            if col!='':
+            if col != '':
                 surf_row.append(float(col))
         surf.append(surf_row)
         surf_row = []
@@ -156,24 +168,25 @@ for y_index in surf_y_index[:-1]:
         # Tangent lead-in and lead-out points calculation:
         if y_index == 1 and surf[0][int(x_index)] != 0:
             # index 0:1 Out, index 2:3 In
-            #     print(surf_slope[int(r_index)][int(a_index)])
-            #     print(a_index)
-            introOutro[0][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][2] -
-                                           surf_slope[int(y_index - 1)][int(x_index)][2]) / \
-                                           x_resolution * -in_out_length + surf_slope[int(y_index - 1)][int(x_index)][2]
-            introOutro[1][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][3] -
-                                           surf_slope[int(y_index - 1)][int(x_index)][3]) / \
-                                           y_resolution * -in_out_length + surf_slope[int(y_index - 1)][int(x_index)][3]
+            # print(surf_slope[int(y_index)][int(x_index)])
+            # print('X ',surf[0][int(x_index) + 1],'yInd ',y_index,'xInd ',x_index)
+            introOutro[0][int(x_index)] = (surf_slope[int(y_index + 1)][int(x_index)][2] -
+                                           surf_slope[int(y_index)][int(x_index)][2]) / \
+                                          x_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][2]
+            introOutro[1][int(x_index)] = (surf_slope[int(y_index + 1)][int(x_index)][3] -
+                                           surf_slope[int(y_index)][int(x_index)][3]) / \
+                                          y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][3]
             if debug:
                 in_out_choice[1][int(x_index)] = 1
         elif y_index == surf_y_index[-2] and surf[int(y_index)][int(x_index)] != 0:
             introOutro[2][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][2] -
                                            surf_slope[int(y_index - 1)][int(x_index)][2]) / \
-                                           x_resolution * in_out_length + surf_slope[int(y_index)][int(x_index)][2]
+                                          x_resolution * in_out_length + surf_slope[int(y_index)][int(x_index)][2]
             introOutro[3][int(x_index)] = (surf_slope[int(y_index)][int(x_index)][3] -
                                            surf_slope[int(y_index - 1)][int(x_index)][3]) / \
-                                           y_resolution * in_out_length + surf_slope[int(y_index)][int(x_index)][3]
+                                          y_resolution * in_out_length + surf_slope[int(y_index)][int(x_index)][3]
             if debug:
+                print(x_index, y_index, introOutro[2][int(x_index)], introOutro[3][int(x_index)])
                 in_out_choice[0][int(x_index)] = 2
         elif surf[int(y_index)][int(x_index)] != 0 and surf[int(y_index) - 1][int(x_index)] == 0:
             if surf[int(y_index) - 1][int(x_index)] == 0 and surf[int(y_index) + 1][int(x_index)] == 0:
@@ -186,19 +199,21 @@ for y_index in surf_y_index[:-1]:
             else:
                 x_out_point = (surf_slope[int(y_index) + 1][int(x_index)][2] -
                                surf_slope[int(y_index)][int(x_index)][2]) / \
-                               y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][2]
+                              y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][2]
                 z_out_point = (surf_slope[int(y_index) + 1][int(x_index)][3] -
                                surf_slope[int(y_index)][int(x_index)][3]) / \
-                               y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][3]
+                              y_resolution * -in_out_length + surf_slope[int(y_index)][int(x_index)][3]
                 introOutro[0][int(x_index)] = x_out_point
                 introOutro[1][int(x_index)] = z_out_point
                 if debug:
                     in_out_choice[1][int(x_index)] = 4
         elif surf[int(y_index)][int(x_index)] != 0 and surf[int(y_index) + 1][int(x_index)] == 0:
             x_in_point = surf_slope[int(y_index)][int(x_index)][2] + (surf_slope[int(y_index)][int(x_index)][2] -
-                         surf_slope[int(y_index) - 1][int(x_index)][2]) / y_resolution * in_out_length
+                                                                      surf_slope[int(y_index) - 1][int(x_index)][
+                                                                          2]) / y_resolution * in_out_length
             z_in_point = surf_slope[int(y_index)][int(x_index)][3] + (surf_slope[int(y_index)][int(x_index)][3] -
-                         surf_slope[int(y_index) - 1][int(x_index)][3]) / y_resolution * in_out_length
+                                                                      surf_slope[int(y_index) - 1][int(x_index)][
+                                                                          3]) / y_resolution * in_out_length
             introOutro[2][int(x_index)] = x_in_point
             introOutro[3][int(x_index)] = z_in_point
             if debug:
@@ -262,15 +277,15 @@ ncchildfile = xyz_filename + ' Blazed Grating Child.nc'
 
 header_blocks = '( File generated by RadialToolpath.py by Oliver Spires / ojspires@email.arizona.edu / 850-240-1897 ) \n( on: ' \
                 + str(now)[:19] + \
-                '. This script assumes a half-radius tool, calibrated in in position T0101.) ' \
-                ' \n#541 = 2              ( Number of loops )' \
-                ' \n#542 = 0.01           ( DoC )' \
-                ' \n#543 = 1000           ( Feed )' \
-                ' \n#506 = 0              ( Loop Counter )' \
-                ' \n#547 = 0              ( Cut offset Var )' \
-                ' \n \nG71 G01 G18 G40 G63 G90 G94 G54 \nT0101 \nG53 Z-180 F[#543]' \
-                ' \nY0 \nM80 \nC0 \n\n( CUTTING BLOCKS ) \n' \
-                ' \nM98(' + ncchildfile.split('/')[-1] + ')L#541 \n'
+                '. This script assumes a ' + str(tool_radius) + 'mm radius tool, calibrated in in position T0101.) ' \
+                                                                ' \n#541 = 2              ( Number of loops )' \
+                                                                ' \n#542 = 0.01           ( DoC )' \
+                                                                ' \n#543 = 1000           ( Feed )' \
+                                                                ' \n#506 = 0              ( Loop Counter )' \
+                                                                ' \n#547 = 0              ( Cut offset Var )' \
+                                                                ' \n \nG71 G01 G18 G40 G63 G90 G94 G54 \nT0101 \nG53 Z-180 F[#543]' \
+                                                                ' \nY0 \nM80 \nC0 \n\n( CUTTING BLOCKS ) \n' \
+                                                                ' \nM98(' + ncchildfile.split('/')[-1] + ')L#541 \n'
 closeout_blocks = '\n( CLOSEOUT BLOCKS ) \nM79 \nM29 \nG52 \nG53 Z-180 F[#543] \nT0000 \nM30 \n'
 # plt.plot(profile_x[1:], profile_z[1:])
 # plt.show()
@@ -332,7 +347,8 @@ for x_index in surf_x_index[1:]:
             if debug:
                 child_cutting = ' '.join([child_cutting, '{:1f} {:1f}'.format(in_out_choice[0][int(x_index)],
                                                                               in_out_choice[1][int(x_index)])])
-        elif surf[int(index)][int(x_index)] != 0 and ((surf[int(index) - 1][int(x_index)] == 0 and index - 1 == 0) or (surf[int(index) - 1][int(x_index)] == 0 and surf[int(index) - 2][int(x_index)] == 0)):
+        elif surf[int(index)][int(x_index)] != 0 and ((surf[int(index) - 1][int(x_index)] == 0 and index - 1 == 0) or (
+                surf[int(index) - 1][int(x_index)] == 0 and surf[int(index) - 2][int(x_index)] == 0)):
             child_cutting = ' \n'.join([child_cutting,
                                         'C0 X{:.10f} Y{:.10f} Z{:.10f} (Outro)'.format(
                                             introOutro[0][int(x_index)],
@@ -352,7 +368,8 @@ for x_index in surf_x_index[1:]:
                                         ])
             if debug:
                 child_cutting = ' '.join([child_cutting, '{:1f}'.format(in_out_choice[0][int(x_index)])])
-        elif surf[int(index)][int(x_index)] != 0 and surf[int(index) + 1][int(x_index)] == 0:   # Test this elif stmt 11-5-18
+        elif surf[int(index)][int(x_index)] != 0 and surf[int(index) + 1][
+            int(x_index)] == 0:  # Test this elif stmt 11-5-18
             child_cutting = ' \n'.join([child_cutting,
                                         'Y{:.10f} \nZ{:.10f} \n/M26 \nC0 X{:.10f} Y{:.10f} Z{:.10f} (Intro)'.format(
                                             -surf[int(index)][0] + in_out_length,
@@ -389,7 +406,7 @@ for x_index in surf_x_index[1:]:
 
     child_cutting = ' \n'.join([
         child_cutting,
-        '/M29 \nZ{:.10f} \n'.format(introOutro[1][int(x_index)] + 2,)
+        '/M29 \nZ{:.10f} \n'.format(introOutro[1][int(x_index)] + 2, )
     ])
 
     child_out.writelines(child_cutting)  # writing out to the file after every X saves a TON of time!!!
