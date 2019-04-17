@@ -1,4 +1,4 @@
-# ncPostProc.py	1.2.1
+# ncPostProc.py	1.2.2
 # Oliver Spires		University of Arizona Micro-Optical Fabrication Facility	11/2/2017
 # This script performs post-processing on *.nc files produced by NanoCAM 2D V 1.52.00.
 # Features (1.0):
@@ -39,6 +39,7 @@
 # - Changed the if statement for placing the parking position and mist variables' definition lines, to avoid duplicate declarations
 # - Removed the variable from the G54-G59 offsets; variables don't work in this G code
 # - Gathered some more of the variable declarations and gathered the if statements for the child file(s)
+# - TODO: Make this compatible with already-postprocessed files from previous versions of this script
 
 # Setup
 from tkinter import filedialog
@@ -59,6 +60,8 @@ offset_search = re.compile('G5[4-9]')
 rc_subroutine = sf_subroutine = fc_subroutine = False
 child_index = -1
 b_axis_installed = True
+nc_child_index = 0
+mist_var = 563
 
 if b_axis_installed:
     y_parking_position = str(-15)
@@ -93,8 +96,6 @@ for line in mnfile:          # Look for the child script
         nc_child_filepaths[nc_child_index] = ncfcfilename
 mnfile.close()
 shutil.move(ncmainfilename, ncmainfilename + ".original")
-
-
 
 
 for child in nc_child_filepaths:
@@ -156,10 +157,8 @@ for child in nc_child_filepaths:
                     mist_updated = True
             except IndexError:
                 # print("no mist found \n")
-                mist_not_found = True                   # This variable isn't used; it's just used to prevent errors on the exception
                 pass
-            else:
-                print(mist_not_found)
+
             prevline = line
             ncfcoutfile.write(line)                    # Write the modified or initial code to the outfile
         ncfcinfile.close()
