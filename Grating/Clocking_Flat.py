@@ -7,8 +7,8 @@
 import numpy as np
 # from _ScoopPathYZ import scoop_path_yz
 # from _XZCoordFromNC import x_z_to_nc
-import tkinter
 from tkinter import *
+from tkinter import filedialog
 # import matplotlib.pyplot as plt
 from datetime import datetime as dt
 
@@ -30,76 +30,132 @@ offset_C =          90
 offset_group =      56
 z_start =           0
 clearance =         .5
+all_fields = []
 
 # Test Section: GUI
-tool_flat_side = StringVar()
-tool_flat_side.set('L')
 
-fields = 'Part Diameter', 'Offset from Center', 'Initial Cut Depth', 'Final Cut Depth', 'Depth of Cut', 'Tool Number', 'Tool Radius', 'Feedrate'
-selectors = 'Tool Flat Side', 'Mist Number', 'C Offset', 'G54 Offset'
-selections = ((('Left', 'L'), ('Right', 'R')),
-              (('Mist 1', '26'), ('Mist 2', '27')),
-              (('None', '0'), ('90 CW', '90'), ('180', '180'), ('90 CCW', '270')),
-              (('G54', '54'), ('G55', '55'), ('G56', '56'), ('G57', '57'), ('G58', '58'), ('G59', '59')))
-w = StringVar()
-w.set('26')
+fields = 'Part Diameter', 'Offset from Center', 'Initial Cut Depth', 'Final Cut Depth', 'Depth of Cut', 'Tool Radius', 'Feedrate'
+# selectors = 'Tool Flat Side', 'Mist Number', 'C Offset', 'G54 Offset'
+selections = (('Tool Flat Side', ('L', 'R')),
+              ('Mist Number', ('Mist 1', 'Mist 2')),
+              ('C Offset', ('None', '90 CW', '180', '90 CCW')),
+              ('G54 Offset', ('G54', 'G55', 'G56', 'G57', 'G58', 'G59')),
+              ('Tool Number', list(np.linspace(1, 40, 40).astype(int))))
 
+root = Tk()
+root.title("Select options and close")
 
-def fetch(entries):
-    for entry in entries:
-        field = entry[0]
-        text  = entry[1].get()
-        if field == 'Tool Number':
-            try:
-                if 1 <= text <= 50:
-                    text = f'{text:02}'
-                else:
-                    raise
-            except ValueError:
-                print('Tool numbers must be integers between 1 and 50, inclusive')
-        print('%s: "%s"' % (field, text))
+# Add a grid
+mainframe = Frame(root)
+mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
+mainframe.columnconfigure(0, weight=1)
+mainframe.rowconfigure(0, weight=1)
+mainframe.pack(pady=10, padx=10)
+col_num = 0
+variables_gui = []
 
+for name, options in selections:
+    # Create a Tkinter variable
+    tkvar = StringVar(root)
 
-def makeform(root, fields):
-    entries = []
-    for field in fields:
-        row = Frame(root)
-        lab = Label(row, width=15, text=field, anchor='w')
-        ent = Entry(row)
-        row.pack(side=TOP, fill=X, padx=5, pady=5)
-        lab.pack(side=LEFT)
-        ent.pack(side=RIGHT, expand=YES, fill=X)
-        entries.append((field, ent))
-    selector0 = selectors[0]
-    for text, mode in selections[0]:
-        ent = Radiobutton(root, text=text, variable=tool_flat_side, value=mode)
-        ent.pack(anchor=W)
-    return entries
+    # Dictionary with options
+    tkvar.set(options[0])  # set the default option
 
-
-if __name__ == '__main__':
-    root = tkinter.Tk()
-    ents = makeform(root, fields)
-    root.bind('<Return>', (lambda event, e=ents: fetch(e)))
-    b1 = Button(root, text='Show',
-           command=(lambda e=ents: fetch(e)))
-    b1.pack(side=LEFT, padx=5, pady=5)
-    b2 = Button(root, text='Quit', command=root.quit)
-    b2.pack(side=LEFT, padx=5, pady=5)
-    root.mainloop()
+    popupMenu = OptionMenu(mainframe, tkvar, *options)
+    Label(mainframe, text=name).grid(row=1, column=col_num)
+    popupMenu.grid(row=2, column=col_num)
+    col_num += 1
+    variables_gui.append(tkvar)
+row_num = 3
+fields_gui = []
+for field in fields:
+    # print(field)
+    entry_label = Label(mainframe, text=field).grid(row=row_num, column=0)
+    entry = Entry(mainframe)
+    entry.grid(row=row_num, column=2)
+    fields_gui.append((field, entry))
+    row_num += 1
 
 
+# on change dropdown value
+def change_dropdown():
+    for tkvar_inner in variables_gui:
+        print(tkvar_inner.get())
+
+
+def fetch(fields_func):
+    global all_fields
+    all_fields = []
+    for fetch_entry in fields_func:
+        fetch_field = fetch_entry[0]
+        text = fetch_entry[1].get()
+        print('%s: "%s"' % (fetch_field, text))
+        all_fields.append(text)
+
+
+# link function to change dropdown
+# tkvar.trace('w', change_dropdown)
+for tkvar in variables_gui:
+    tkvar.trace('w', change_dropdown)
+root.bind('<Return>', (lambda event, e=fields_gui: fetch(e)))
+b1 = Button(root, text='Enter',
+            command=(lambda e=fields_gui: fetch(e)))
+b1.pack(side=LEFT, padx=5, pady=5)
+b2 = Button(root, text='Quit', command=root.quit)
+b2.pack(side=LEFT, padx=5, pady=5)
+
+root.mainloop()
+
+# convert the variables that came from the GUI
+if all_fields == [] or "" in all_fields:
+    print('Input error: data missing. Re-run program.')
+    root.quit()
+    root.withdraw()
+    valid_data = False
+else:
+    cut_spacing = float(all_fields[4])         # assign values to dropbox selections
+    cut_depth = float(all_fields[3])
+    part_diameter = float(all_fields[0])
+    flat_from_center = float(all_fields[1])
+    tool_radius = float(all_fields[5])
+    feed_rate = int(all_fields[6])
+    mist_num = int(variables_gui[1].get()[-1]) + 25   # 'Mist 1' -> 25 + 1 = 26, 'Mist 2' -> 25 + 2 = 27
+    if variables_gui[2].get() == 'None':
+        offset_C = 0
+    elif variables_gui[2].get() == '90 CW':
+        offset_C = 90
+    elif variables_gui[2].get() == '180':
+        offset_C = 180
+    elif variables_gui[2].get() == '90 CCW':
+        offset_C = 270
+    else:
+        print('C Offset error')
+    offset_group = variables_gui[3].get()
+    tool_num = variables_gui[4].get()
+    print('Input successful')
+    a = 0
+    for title in fields:
+        print('%s: "%s"' % (title, all_fields[a]))
+        a += 1
+    b = 0
+    for tkvar in variables_gui:
+        print(selections[b][0], ': ', tkvar.get())
+        b += 1
+    root.withdraw()
+    valid_data = True
 # Import the file
 
 
 header_blocks = '( File generated by Clocking_Flat.py by Oliver Spires / ojspires@email.arizona.edu / 850-240-1897 ) \n( on: ' \
                 + str(now)[:19] + \
-                '. This script assumes a tool clocked so that its ' + tool_flat_side + ' edge allows a vertical cut.) ' \
-                '\n(  ) ' \
-                '\n \nG71 G01 G18 G40 G63 G90 G94 G' + str(offset_group) + \
-                ' \nG52 \nT' + str(tool_num)*2 + ' \nG53 Z-80 F' + \
-                str(feed_rate) + \
-                ' \nY0B0 \nM80 \nC' + str(offset_C) + ' \n\n( CUTTING BLOCKS ) \nM' + str(mist_num) + ' \n'
+                '. This script assumes a tool clocked so that its ' + tool_flat_side + \
+                ' edge allows a vertical cut.)' \
+                ' \n(  ) \n \nG71 G01 G18 G40 G63 G90 G94 ' + offset_group + \
+                ' \nG52 \nT' + str(tool_num)*2 + \
+                ' \nG53 Z-80 F' + str(feed_rate) + \
+                ' \nY0B0 \nM80 \nC' + str(offset_C) + \
+                ' \n\n( CUTTING BLOCKS ) \nM' + str(mist_num) + \
+                ' \n'
 closeout_blocks = '\n( CLOSEOUT BLOCKS ) \nM29 \nG52 \nG53 Z-80 F' + str(feed_rate) + '\nM79 \nT0000 \nM30 \n'
 
 
@@ -138,19 +194,22 @@ index_z = np.size(z_coords) - 1
 while index_z >= 0:
     index_x = np.size(clearance_y) - 1
     while index_x >= 0:
-        cutting_blocks = cutting_blocks + ' \nX' + str(np.round(x_coords[index_x], 6)) + ' Y' + \
-                         str(np.round(clearance_y[index_x], 8)) + ' \nY-' + \
-                         str(np.round(clearance_y[index_x], 8)) + ' \nZ' + \
-                         str(np.round(z_coords[index_z], 3) + np.round(clearance, 3)) + ' \nX' + \
-                         str(np.round(x_coords[index_x], 6)) + ' Y' + \
-                         str(np.round(clearance_y[index_x], 8)) + ' \nZ' + \
-                         str(np.round(z_coords[index_z], 3))
+        cutting_blocks = cutting_blocks + ' \nX' + str(np.round(x_coords[index_x], 6)) + \
+                         ' Y' + str(np.round(clearance_y[index_x], 8)) + \
+                         ' \nY-' + str(np.round(clearance_y[index_x], 8)) + \
+                         ' \nZ' + str(np.round(z_coords[index_z], 3) + np.round(clearance, 3)) + \
+                         ' \nX' + str(np.round(x_coords[index_x], 6)) + \
+                         ' Y' + str(np.round(clearance_y[index_x], 8)) + \
+                         ' \nZ' + str(np.round(z_coords[index_z], 3))
         index_x -= 1
     index_z -= 1
-
-root.filename = filedialog.asksaveasfilename(initialdir="C:\\", title="Save this file:", defaultextension=".nc", filetypes=(("gcode files", "*.nc"), ("all files", "*.*")))
-main_text = [header_blocks, cutting_blocks, closeout_blocks]
-main_out = open(root.filename, 'w+')  # designate the output file
-main_out.writelines(main_text)
-main_out.close()
+if valid_data:
+    root.filename = filedialog.asksaveasfilename(initialdir="C:\\", title="Save this file:", defaultextension=".nc", filetypes=(("gcode files", "*.nc"), ("all files", "*.*")))
+    main_text = [header_blocks, cutting_blocks, closeout_blocks]
+    if root.filename != '':
+        main_out = open(root.filename, 'w+')  # designate the output file
+        main_out.writelines(main_text)
+        main_out.close()
+    else:
+        print('Filename not designated. Please try again.')
 root.destroy()
