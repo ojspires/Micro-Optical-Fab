@@ -1,4 +1,3 @@
-#!C:\Program Files\Python36\python.exe
 # DiamAlign.py   Oliver Spires      10/18/2019
 # This file accepts input of data about alignment metrology, and provides a prescription for machine adjustments. The
 # intended machine for this script to be use with is the Moore Nanotech 350FG, with default axis orientations.
@@ -15,7 +14,7 @@ fields = 'Designed Radius of Curvature (mm)', 'Measured Radius of Curvature (mm)
 selections = (('Part Rotation', ('CW', 'CCW')),
               ('Part Shape', ('Convex |)', 'Concave |(')),
               ('Machining Type', ('Cutting', 'Grinding')),
-              ('Fringe Movement', ('Inward as Part -> Interferometer', 'Outward as Part -> Interferometer')),
+              ('Fringe Movement', ('Inward', 'Outward')),
               ('Center Pip Shape', ('Cylinder []', 'Cone /\\')),
               ('Profile Shape', ('M', 'W')))
 outputs = 'X Adjust by: (mm)', 'Y Adjust by: (mm)', 'Z Adjust by: (mm)', \
@@ -35,8 +34,6 @@ center_diam = 0
 profile_m = True
 profile_pv = .147
 tool_radius = 1.892147
-
-
 
 root = Tk()
 root.title("Select options and close")
@@ -58,8 +55,17 @@ for name, options in selections:
     tkvar.set(options[0])  # set the default option
 
     popupMenu = OptionMenu(mainframe, tkvar, *options)
-    Label(mainframe, text=name).grid(row=1, column=col_num)
-    popupMenu.grid(row=2, column=col_num)
+    if name == 'Profile Shape':
+        popupMenu.grid(row=9, column=2)
+    elif name == 'Part Shape':
+        popupMenu.grid(row=3, column=2)
+    elif name == 'Center Pip Shape':
+        popupMenu.grid(row=8, column=2)
+    elif name == 'Fringe Movement':
+        popupMenu.grid(row=7, column=2)
+    else:
+        Label(mainframe, text=name).grid(row=1, column=col_num)
+        popupMenu.grid(row=2, column=col_num)
     col_num += 1
     variables_gui.append(tkvar)
 row_num = 3
@@ -68,12 +74,12 @@ for field in fields:
     # print(field)
     entry_label = Label(mainframe, text=field).grid(row=row_num, column=0)
     entry = Entry(mainframe)
-    entry.grid(row=row_num, column=2)
+    entry.grid(row=row_num, column=3)
     fields_gui.append((field, entry))
     row_num += 1
 
 # on change dropdown value
-def change_dropdown():
+def change_dropdown(*args):
     for tkvar_inner in variables_gui:
         print(tkvar_inner.get())
 
@@ -94,6 +100,8 @@ def fetch(fields_func):
     pip_diam = float(all_fields[5])
     shape_pv = float(all_fields[6])
     tool_rad = float(all_fields[7])
+    # print('all fields printout:')
+    # print(all_fields)
     if variables_gui[0].get() == 'CW':
         part_cw = True
     else:
@@ -106,7 +114,7 @@ def fetch(fields_func):
         cutting = True
     else:
         cutting = False
-    if variables_gui[3].get() == 'Inward as Part -> Interferometer':
+    if variables_gui[3].get() == 'Inward':
         fringes_in = True
     else:
         fringes_in = False
@@ -124,9 +132,9 @@ def fetch(fields_func):
     row_num = 4
     row = 0
     for output in outputs:
-        output_label = Label(mainframe, text=output).grid(row=row_num, column=3)
-        clear_window = Label(mainframe, text='            ').grid(row=row_num, column=4)
-        output_data = Label(mainframe, text=calculated_values[row]).grid(row=row_num, column=4)
+        Label(mainframe, text=output).grid(row=row_num, column=4)
+        Label(mainframe, text='            ').grid(row=row_num, column=5)
+        Label(mainframe, text=calculated_values[row]).grid(row=row_num, column=5)
         row_num += 1
         row += 1
 

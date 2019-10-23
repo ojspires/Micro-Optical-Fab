@@ -9,6 +9,7 @@ import numpy as np
 def align_calc(part_radius: float, part_radius_meas: float, part_diam: float, part_diam_meas: float, part_cx: bool,
                cut_cw: bool, cutting: bool, ogive: float, fringe_in: bool, center_cyl: bool, center_diam: float,
                profile_m: bool, profile_pv: float, tool_radius: float):
+    print('_AlignCalc Inputs:')
     print(part_radius, part_radius_meas, part_diam, part_diam_meas, part_cx, cut_cw, cutting,
           ogive, fringe_in, center_cyl, center_diam, profile_m, profile_pv, tool_radius)
     max_fnum_to_use = part_radius / part_diam
@@ -26,14 +27,15 @@ def align_calc(part_radius: float, part_radius_meas: float, part_diam: float, pa
 
     x_error_ogive = .000318 * ogive * part_radius_meas / part_diam_meas
     if cutting:
-        x_error_ogive = np.negative(x_error_ogive)
+        x_error_ogive = -x_error_ogive
     if not part_cx:
-        x_error_ogive = np.negative(x_error_ogive)
+        x_error_ogive = -x_error_ogive
     if cut_cw:
-        x_error_ogive = np.negative(x_error_ogive)
+        x_error_ogive = -x_error_ogive
     if fringe_in:
-        x_error_ogive = np.negative(x_error_ogive)
+        x_error_ogive = -x_error_ogive
     x_adjust_ogive = x_error_ogive
+    print('Commanded adjustment based on ogive:')
     print(x_adjust_ogive)
 
     x_error_pv = part_radius_meas / part_diam_meas * 0.008 * profile_pv
@@ -44,6 +46,7 @@ def align_calc(part_radius: float, part_radius_meas: float, part_diam: float, pa
     if not profile_m:
         x_error_pv = np.negative(x_error_pv)
     x_adjust_pv = x_error_pv
+    print('Commanded adjustment based on PV:')
     print(x_adjust_pv)
 
     if ogive == 0:
