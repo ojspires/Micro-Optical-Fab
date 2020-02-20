@@ -1,8 +1,13 @@
+# FreeformDefinition.py     Oliver Spires   University of Arizona   1/31/2020
+# This program takes user input from either the console or input arguments and builds feature definitions and arrays.
+# TODO: use while loops and try...except ValueError to verify each input
+
+import numpy
+
 
 def define_freeform(arrays=None, capturing_feature_data=False):
     if arrays is None:
         arrays = []
-    import numpy
 
     features = []
     all_array_coords = []
@@ -14,15 +19,17 @@ def define_freeform(arrays=None, capturing_feature_data=False):
 
         # Enter feature parameters
         feature_type = input('Enter the feature type (Sphere, Asphere, Plane) (Don\'t enter a plane first, and just hit ENTER when all entry is complete:').lower()
-        if feature_type == 'sphere':
+        if feature_type[0] == 's':
+            print('Vertex will be z=0')
             sph_radius = float(input('Enter the radius of the spherical surface in mm (positive = concave, negative = convex):'))
             sph_diam = abs(float(input('Enter the diameter of the spherical surface in mm:')))
             sph_center = input('Enter the center coordinates of this spherical surface, in x,y order:')
-            edge_sag = sph_radius * (1 - numpy.cos(numpy.arcsin(sph_diam/2/sph_radius)))
+            edge_sag = sph_radius * (1 - numpy.cos(numpy.arcsin(sph_diam / 2 / sph_radius)))
             feature_specs = [feature_type, sph_radius, sph_diam, sph_center, edge_sag]
             features.append(feature_specs)
-        elif feature_type == 'asphere':
-            asph_radius = float(input('Enter the radius of the spherical surface in mm (positive = concave, negative = convex):'))
+        elif feature_type[0] == 'a':
+            print('Vertex will be z=0')
+            asph_radius = float(input('Enter the radius of the aspheric surface in mm (positive = concave, negative = convex):'))
             asph_diam = abs(float(input('Enter the diameter of the spherical surface in mm:')))
             asph_conic = float(input('Enter the conic constant (oblate elliptical (K > 0), spherical (K = 0), prolate elliptical (0 > K > −1), parabolic (K = −1), hyperbolic (K < −1)):'))
             asph_even = input('Enter the even aspheric constants, starting from the 4th:').split(',')    # Input is text, don't forget to convert to float when extracting the coords
@@ -36,19 +43,20 @@ def define_freeform(arrays=None, capturing_feature_data=False):
                 coeff_order += 2
             feature_specs = [feature_type, asph_radius, asph_diam, asph_conic, asph_even, asph_center, asph_curv, asph_h_diam, edge_sag]
             features.append(feature_specs)
-        elif feature_type == 'plane':
+        elif feature_type[0] == 'p':
             array = False
-            plane_diam = float(input('Enter the diameter of the plane in mm:'))
+            plane_diam = abs(float(input('Enter the diameter of the plane in mm:')))
             edge_sag = float(input('Enter the height of this plane (you probably want to set this equal to the lens sag):'))
             feature_specs = [feature_type, plane_diam, edge_sag]
             features.append(feature_specs)
         else:
+            print('Sphere, Asphere, or Plane not selected. Finishing surface definition.')
             capturing_feature_data = False
             continue                        # Exit the while loop when the user is done entering feature data
         print('Edge Sag = ', edge_sag)
 
         # Enter array parameters
-        if feature_type != 'Plane':
+        if feature_type[0] != 'p':
             array = input('Turn this feature into an array? (Y/N)').upper()[0]
             if array == 'Y':
                 array = True
@@ -89,7 +97,7 @@ def define_freeform(arrays=None, capturing_feature_data=False):
                 array_coords.append([ny * a[3] * numpy.sin(numpy.deg2rad(float(a[5]))) + nx * a[3] + float(a[1][0]), ny * a[3] * y_modifier + float(a[1][1])])
         print(array_coords)
         all_array_coords.append(array_coords)
-    return all_array_coords
+    return features, arrays, all_array_coords
 
 
 if __name__ == '__main__':

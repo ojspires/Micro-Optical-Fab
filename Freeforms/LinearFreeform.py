@@ -10,7 +10,6 @@
 # TODO: change default Z to 0, from -180
 # TODO: Z retracts just before final swipe (it's identical to what happens on the first swipe)
 
-
 # Import Modules:
 from typing import List, Any
 import numpy as np
