@@ -1,10 +1,15 @@
+# CuttingDefinition.py      Oliver Spires       University of Arizona       2/19/2020
+# This script takes inputs which will define the cutting parameters of a Slow Slide Servo cut. At the moment, it's
+# designed for a Moore Nanotech FG350. If I learn anything about other machines, I could load certain formatting or
+# cutting parameters appropriate to each machine.
+
 import logging
 
 
 # Capture the cutting parameters
 def cut_def():
     rotation = offset = tool_num = tool_radius = step_over = angular_sampling = step_ang = parking = mist_num = inverse_feed = total_doc = pass_doc = ''
-    logging.info('Starting cutting parameter input within module...')
+    logging.debug('Starting cutting parameter input within module...')
     while rotation != 'CW' and rotation != 'CCW':
         rotation = input('CCW or CW cutting?:').upper()
         print(rotation)
@@ -173,6 +178,7 @@ def cut_def():
         except ValueError:
             logging.error('Invalid inverse feed. Value should be a positive float. Clearing and recapturing. Entered: ' + str(inverse_feed))
             inverse_feed = ''
+    logging.debug('Finished collecting cutting parameters. Returning them to user or to the calling program...')
     return rotation, offset, tool_num, tool_radius, step_over, angular_sampling, step_ang, parking, mist_num, inverse_feed, total_doc, pass_doc
 
 
